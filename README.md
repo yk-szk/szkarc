@@ -1,2 +1,2 @@
-# szkzip
-My zip archiving tool.
+# szkarc
+My archiving tools.
