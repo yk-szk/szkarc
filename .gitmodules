@@ -1,0 +1,9 @@
+[submodule "deps/zlib"]
+	path = deps/zlib
+	url = git@github.com:cloudflare/zlib.git
+[submodule "deps/minizip-ng"]
+	path = deps/minizip-ng
+	url = git@github.com:zlib-ng/minizip-ng.git
+[submodule "deps/tclap"]
+	path = deps/tclap
+	url = git@github.com:mirror/tclap.git

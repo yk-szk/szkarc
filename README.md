@@ -1,2 +1,2 @@
 # szkzip
-My zip archiving tool
+My zip archiving tool.
