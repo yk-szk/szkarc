@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <numeric>
+#include <thread>
 #include <mz.h>
 #include <mz_strm.h>
 #include <mz_strm_os.h>
@@ -20,6 +21,13 @@ using std::endl;
 using std::flush;
 using std::runtime_error;
 
+int get_core_counts() {
+#if defined(WIN32)
+  return std::thread::hardware_concurrency() / 2;
+#else
+  return std::thread::hardware_concurrency() / 2;
+#endif
+}
 
 class ZipWriter
 {
@@ -29,8 +37,8 @@ public:
   void* zip_writer;
   void* file_stream;
   int32_t err;
-  ZipWriter(const char* path)
-    : zip_writer(NULL), file_stream(NULL), level(1)
+  ZipWriter(const char* path, int16_t level_)
+    : zip_writer(NULL), file_stream(NULL), level(level_)
   {
     mz_zip_writer_create(&zip_writer);
     mz_stream_os_create(&file_stream);
@@ -105,6 +113,8 @@ int main(int argc, char* argv[])
     cmd.add(a_output);
     TCLAP::ValueArg<std::string> a_depth("d", "depth", "(optional) Depth of the subdirectories.", false, "0", "int");
     cmd.add(a_depth);
+    TCLAP::ValueArg<std::string> a_jobs("j", "jobs", "(optional) Number of simultaneous jobs.", false, "0", "int");
+    cmd.add(a_jobs);
     TCLAP::ValueArg<std::string> a_level("l", "level", "(optional) Compression level.", false, "1", "int");
     cmd.add(a_level);
 
@@ -114,6 +124,7 @@ int main(int argc, char* argv[])
     auto input_dir = fs::path(a_input.getValue());
     auto output_dir = fs::path(a_output.isSet() ? a_output.getValue() : a_input.getValue());
     auto depth = stoi(a_depth.getValue());
+    auto jobs = stoi(a_jobs.getValue());
     auto level = stoi(a_level.getValue());
     auto subdirs = list_subdirs(input_dir, depth);
     if (a_dryrun.isSet()) {
@@ -138,16 +149,32 @@ int main(int argc, char* argv[])
        option::ShowElapsedTime{true},
        option::ShowRemainingTime{true},
     };
-    int count = 0;
-    for (const auto &subdir : subdirs) {
-      auto relative = subdir.lexically_relative(input_dir);
-      auto output = output_dir / (relative.string() + ".zip");
-      if (!fs::exists(output.parent_path())) {
-        fs::create_directories(output.parent_path());
-      }
-      ZipWriter writer(output.string().c_str());
-      writer.add_dir(subdir);
-      bar.tick();
+    if (jobs <= 0) {
+      jobs = get_core_counts();
+      cout << "Using " << jobs << " cores." << endl;
+    }
+    std::mutex mtx_mkdir;
+    std::vector<std::thread> threads;
+    threads.reserve(jobs);
+    for (int job_id = 0; job_id < jobs; ++job_id) {
+      threads.emplace_back([job_id, jobs, level, &subdirs, &input_dir, &output_dir, &bar, &mtx_mkdir]() {
+        for (int i = job_id; i < subdirs.size(); i += jobs) {
+          auto &subdir = subdirs[i];
+          auto relative = subdir.lexically_relative(input_dir);
+          auto output = output_dir / (relative.string() + ".zip");
+          mtx_mkdir.lock();
+          if (!fs::exists(output.parent_path())) {
+            fs::create_directories(output.parent_path());
+          }
+          mtx_mkdir.unlock();
+          ZipWriter writer(output.string().c_str(), level);
+          writer.add_dir(subdir);
+          bar.tick();
+        }
+        });
+    }
+    for (auto &t : threads) {
+      t.join();
     }
   }
   catch (TCLAP::ArgException& e)

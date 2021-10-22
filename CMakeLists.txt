@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON) 
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+FIND_PACKAGE(Threads REQUIRED)
+
 SET(ZLIB_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/deps/zlib-ng;${CMAKE_SOURCE_DIR}/deps/build/zlib-ng")
 IF (WIN32)
 SET(ZLIB_LIBRARY_DEBUG "${CMAKE_SOURCE_DIR}/deps/build/zlib-ng/Debug/zlibstaticd.lib")
@@ -39,4 +41,4 @@ include_directories(deps/indicators/include)
 configure_file(config.h.in config.h @ONLY)
 include_directories("${PROJECT_BINARY_DIR}") # for config.h
 ADD_EXECUTABLE(zipdirs main.cpp)
-TARGET_LINK_LIBRARIES(zipdirs minizip)
+TARGET_LINK_LIBRARIES(zipdirs minizip Threads::Threads)
