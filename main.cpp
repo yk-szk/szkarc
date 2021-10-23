@@ -10,10 +10,12 @@
 #include <mz_strm_os.h>
 #include <mz_zip.h>
 #include <mz_zip_rw.h>
-#include <windows.h>
 #include <tclap/CmdLine.h>
 #include <indicators/progress_bar.hpp>
 #include <config.h>
+#ifdef WIN32
+#include <windows.h>
+#endif
 
 namespace fs = std::filesystem;
 using std::cout;
@@ -75,6 +77,7 @@ int get_physical_core_counts() {
 #endif
 }
 
+#ifdef WIN32
 int32_t stream_os_open(void* stream, const char* path, int32_t mode) {
   typedef struct mz_stream_win32_s {
     mz_stream       stream;
@@ -137,6 +140,7 @@ std::string wstr2utf8(std::wstring const& src)
   std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
   return converter.to_bytes(src);
 }
+#endif
 
 void  zip_directory(const fs::path& input, const fs::path& output, int16_t level) {
   void* zip_writer;
@@ -149,7 +153,7 @@ void  zip_directory(const fs::path& input, const fs::path& output, int16_t level
 #ifdef WIN32
   err = stream_os_open(file_stream, output.string().c_str(), MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
 #else
-  err = mz_stream_os_open(file_stream, path, MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
+  err = mz_stream_os_open(file_stream, output.string().c_str(), MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
 #endif
   if (err != MZ_OK) {
     throw runtime_error("Failed to open a zip file.");
