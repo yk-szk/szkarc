@@ -22,9 +22,54 @@ using std::endl;
 using std::flush;
 using std::runtime_error;
 
-int get_core_counts() {
+int get_physical_core_counts() {
 #if defined(WIN32)
-  return std::thread::hardware_concurrency();
+  typedef BOOL(WINAPI* LPFN_GLPI)(
+    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION,
+    PDWORD);
+  LPFN_GLPI glpi;
+  BOOL done = FALSE;
+  PSYSTEM_LOGICAL_PROCESSOR_INFORMATION buffer = NULL;
+  PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = NULL;
+  DWORD returnLength = 0;
+  DWORD byteOffset = 0;
+  PCACHE_DESCRIPTOR Cache;
+  int processorCoreCount = 0;
+
+  glpi = (LPFN_GLPI)GetProcAddress(GetModuleHandle(TEXT("kernel32")), "GetLogicalProcessorInformation");
+  if (NULL == glpi) {
+    std::runtime_error("GetLogicalProcessorInformation is not supported.");
+  }
+  while (!done) {
+    DWORD rc = glpi(buffer, &returnLength);
+    if (FALSE == rc) {
+      if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+        if (buffer)
+          free(buffer);
+        buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(
+          returnLength);
+
+        if (NULL == buffer) {
+          std::runtime_error("Error: Allocation failure");
+        }
+      }
+      else {
+        std::runtime_error("Error");
+      }
+    }
+    else {
+      done = TRUE;
+    }
+  }
+  ptr = buffer;
+  while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength) {
+    if (ptr->Relationship == RelationProcessorCore) {
+      processorCoreCount++;
+    }
+    byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+    ptr++;
+  }
+  return processorCoreCount;
 #else
   return std::thread::hardware_concurrency();
 #endif
@@ -226,7 +271,7 @@ int main(int argc, char* argv[])
        option::ShowRemainingTime{true},
     };
     if (jobs <= 0) {
-      jobs = get_core_counts();
+      jobs = get_physical_core_counts();
       cout << "Using " << jobs << " cores." << endl;
     }
     std::mutex mtx_mkdir;
