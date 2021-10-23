@@ -143,10 +143,13 @@ private:
 };
 
 using PathList = std::vector<fs::path>;
-PathList list_subdirs(const fs::path& indir, int depth) {
+PathList list_subdirs(const fs::path& indir, int depth, bool include_files) {
   PathList list;
   for (const auto& ent : fs::directory_iterator(indir)) {
     if (ent.is_directory()) {
+      list.push_back(ent.path());
+    }
+    else if (include_files) {
       list.push_back(ent.path());
     }
   }
@@ -156,8 +159,8 @@ PathList list_subdirs(const fs::path& indir, int depth) {
   }
   else {
     std::vector<PathList> subdirs;
-    std::transform(list.cbegin(), list.cend(), std::back_inserter(subdirs), [depth](const fs::path& p) {
-      return list_subdirs(p, depth - 1);
+    std::transform(list.cbegin(), list.cend(), std::back_inserter(subdirs), [depth, include_files](const fs::path& p) {
+      return list_subdirs(p, depth - 1, include_files);
       });
 
     size_t total_size = std::transform_reduce(subdirs.cbegin(), subdirs.cend(), 0u, std::plus{}, [](const PathList& l) {return l.size(); });
@@ -190,6 +193,7 @@ int main(int argc, char* argv[])
     TCLAP::ValueArg<std::string> a_level("l", "level", "(optional) Compression level.", false, "1", "int");
     cmd.add(a_level);
 
+    TCLAP::SwitchArg a_file("", "file", "Compress files too, not just directories.", cmd, false);
     TCLAP::SwitchArg a_dryrun("", "dryrun", "List subdirectories and exit.", cmd, false);
     cmd.parse(argc, argv);
 
@@ -198,7 +202,7 @@ int main(int argc, char* argv[])
     auto depth = stoi(a_depth.getValue());
     auto jobs = stoi(a_jobs.getValue());
     auto level = stoi(a_level.getValue());
-    auto subdirs = list_subdirs(input_dir, depth);
+    auto subdirs = list_subdirs(input_dir, depth, a_file.isSet());
     if (a_dryrun.isSet()) {
       for (const auto& d : subdirs) {
         auto relative = d.lexically_relative(input_dir);
