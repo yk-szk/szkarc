@@ -138,53 +138,43 @@ std::string wstr2utf8(std::wstring const& src)
   return converter.to_bytes(src);
 }
 
-class ZipWriter
-{
-public:
+void  zip_directory(const fs::path& input, const fs::path& output, int16_t level) {
   void* zip_writer;
   void* file_stream;
   int32_t err;
-  ZipWriter(const char* path, int16_t level_)
-    : zip_writer(NULL), file_stream(NULL), level(level_)
-  {
-    mz_zip_writer_create(&zip_writer);
-    mz_stream_os_create(&file_stream);
-    mz_zip_writer_set_compress_method(zip_writer, MZ_COMPRESS_METHOD_DEFLATE);
-    mz_zip_writer_set_compress_level(zip_writer, level);
+  mz_zip_writer_create(&zip_writer);
+  mz_stream_os_create(&file_stream);
+  mz_zip_writer_set_compress_method(zip_writer, MZ_COMPRESS_METHOD_DEFLATE);
+  mz_zip_writer_set_compress_level(zip_writer, level);
 #ifdef WIN32
-    err = stream_os_open(file_stream, path, MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
+  err = stream_os_open(file_stream, output.string().c_str(), MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
 #else
-    err = mz_stream_os_open(file_stream, path, MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
+  err = mz_stream_os_open(file_stream, path, MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
 #endif
-    if (err != MZ_OK) {
-      throw runtime_error("Failed to open a zip file.");
-    }
-    err = mz_zip_writer_open(zip_writer, file_stream, 0);
-    if (err != MZ_OK) {
-      throw runtime_error("Failed to open a zip file.");
-    }
+  if (err != MZ_OK) {
+    throw runtime_error("Failed to open a zip file.");
+  }
+  err = mz_zip_writer_open(zip_writer, file_stream, 0);
+  if (err != MZ_OK) {
+    throw runtime_error("Failed to open a zip file.");
   }
 
-  int32_t add_dir(const fs::path& path) {
 #ifdef WIN32
-    auto utf8 = wstr2utf8(path.wstring());
-    return mz_zip_writer_add_path(zip_writer, utf8.c_str(), NULL, 0, 1);
+  auto utf8 = wstr2utf8(input.wstring());
+  err = mz_zip_writer_add_path(zip_writer, utf8.c_str(), NULL, 0, 1);
 #else
-    return mz_zip_writer_add_path(zip_writer, path.string().c_str(), NULL, 0, 1);
+  err = mz_zip_writer_add_path(zip_writer, input.string().c_str(), NULL, 0, 1);
 #endif
+  if (err != MZ_OK) {
+    throw runtime_error("Failed to compress");
   }
 
-  ~ZipWriter()
-  {
-    err = mz_zip_writer_close(zip_writer);
-    if (err != MZ_OK) {
-      throw runtime_error("Failed to close the zip writer");
-    }
-    mz_stream_os_delete(&file_stream);
-    mz_zip_writer_delete(&zip_writer);
+  err = mz_zip_writer_close(zip_writer);
+  if (err != MZ_OK) {
+    throw runtime_error("Failed to close the zip writer");
   }
-private:
-  int16_t level;
+  mz_stream_os_delete(&file_stream);
+  mz_zip_writer_delete(&zip_writer);
 };
 
 using PathList = std::vector<fs::path>;
@@ -288,8 +278,7 @@ int main(int argc, char* argv[])
             fs::create_directories(output.parent_path());
           }
           mtx_mkdir.unlock();
-          ZipWriter writer(output.string().c_str(), level);
-          writer.add_dir(subdir);
+          zip_directory(subdir, output, level);
           bar.tick();
         }
         });
