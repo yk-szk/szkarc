@@ -156,11 +156,11 @@ void  zip_directory(const fs::path& input, const fs::path& output, int16_t level
   err = mz_stream_os_open(file_stream, output.string().c_str(), MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
 #endif
   if (err != MZ_OK) {
-    throw runtime_error("Failed to open a zip file.");
+    throw runtime_error("Failed to open a zip file:" + output.string());
   }
   err = mz_zip_writer_open(zip_writer, file_stream, 0);
   if (err != MZ_OK) {
-    throw runtime_error("Failed to open a zip file.");
+    throw runtime_error("Failed to open a zip file:" + output.string());
   }
 
 #ifdef WIN32
@@ -170,12 +170,12 @@ void  zip_directory(const fs::path& input, const fs::path& output, int16_t level
   err = mz_zip_writer_add_path(zip_writer, input.string().c_str(), NULL, 0, 1);
 #endif
   if (err != MZ_OK) {
-    throw runtime_error("Failed to compress");
+    throw runtime_error("Failed to compress:" + input.string());
   }
 
   err = mz_zip_writer_close(zip_writer);
   if (err != MZ_OK) {
-    throw runtime_error("Failed to close the zip writer");
+    throw runtime_error("Failed to close the zip writer:" + output.string());
   }
   mz_stream_os_delete(&file_stream);
   mz_zip_writer_delete(&zip_writer);
@@ -233,6 +233,7 @@ int main(int argc, char* argv[])
     cmd.add(a_level);
 
     TCLAP::SwitchArg a_file("", "file", "Compress files too, not just directories.", cmd, false);
+    TCLAP::SwitchArg a_skip("", "skip", "Skip existing files.", cmd, false);
     TCLAP::SwitchArg a_dryrun("", "dryrun", "List subdirectories and exit.", cmd, false);
     cmd.parse(argc, argv);
 
@@ -242,6 +243,16 @@ int main(int argc, char* argv[])
     auto jobs = stoi(a_jobs.getValue());
     auto level = stoi(a_level.getValue());
     auto subdirs = list_subdirs(input_dir, depth, a_file.isSet());
+    if (a_skip.isSet()) {
+      auto result = std::remove_if(subdirs.begin(), subdirs.end(), [&input_dir, &output_dir](auto &d) {
+        auto relative = d.lexically_relative(input_dir);
+        auto output = (output_dir / relative).string() + ".zip";
+        return fs::exists(output);
+        });
+      auto orig_size = subdirs.size();
+      subdirs.erase(result, subdirs.end());
+      cout << "Skip " << orig_size - subdirs.size() << " entries." << endl;
+    }
     if (a_dryrun.isSet()) {
       for (const auto& d : subdirs) {
         auto relative = d.lexically_relative(input_dir);
