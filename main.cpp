@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <numeric>
 #include <thread>
+#include <exception>
 #include <mz.h>
 #include <mz_os.h>
 #include <mz_strm.h>
@@ -177,6 +178,7 @@ void  zip_directory(const fs::path& input, const fs::path& output, int16_t level
   if (err != MZ_OK) {
     throw runtime_error("Failed to close the zip writer:" + output.string());
   }
+  mz_stream_os_close(file_stream);
   mz_stream_os_delete(&file_stream);
   mz_zip_writer_delete(&zip_writer);
 };
@@ -244,7 +246,7 @@ int main(int argc, char* argv[])
     auto level = stoi(a_level.getValue());
     auto subdirs = list_subdirs(input_dir, depth, a_file.isSet());
     if (a_skip.isSet()) {
-      auto result = std::remove_if(subdirs.begin(), subdirs.end(), [&input_dir, &output_dir](auto &d) {
+      auto result = std::remove_if(subdirs.begin(), subdirs.end(), [&input_dir, &output_dir](auto& d) {
         auto relative = d.lexically_relative(input_dir);
         auto output = (output_dir / relative).string() + ".zip";
         return fs::exists(output);
@@ -279,27 +281,38 @@ int main(int argc, char* argv[])
       jobs = get_physical_core_counts();
       cout << "Using " << jobs << " cores." << endl;
     }
+    std::exception_ptr ep;
     std::mutex mtx_mkdir;
     std::vector<std::thread> threads;
     threads.reserve(jobs);
     for (int job_id = 0; job_id < jobs; ++job_id) {
-      threads.emplace_back([job_id, jobs, level, &subdirs, &input_dir, &output_dir, &bar, &mtx_mkdir]() {
+      threads.emplace_back([job_id, jobs, level, &subdirs, &input_dir, &output_dir, &bar, &mtx_mkdir, &ep]() {
         for (int i = job_id; i < subdirs.size(); i += jobs) {
-          auto& subdir = subdirs[i];
+          const auto& subdir = subdirs[i];
           auto relative = subdir.lexically_relative(input_dir);
           auto output = output_dir / (relative.string() + ".zip");
-          mtx_mkdir.lock();
-          if (!fs::exists(output.parent_path())) {
-            fs::create_directories(output.parent_path());
+          {
+            std::lock_guard<std::mutex> lock(mtx_mkdir);
+            if (!fs::exists(output.parent_path())) {
+              fs::create_directories(output.parent_path());
+            }
           }
-          mtx_mkdir.unlock();
-          zip_directory(subdir, output, level);
+          try {
+            zip_directory(subdir, output, level);
+          }
+          catch (...) {
+            ep = std::current_exception();
+            break;
+          }
           bar.tick();
         }
         });
     }
     for (auto& t : threads) {
       t.join();
+    }
+    if (ep) {
+      std::rethrow_exception(ep);
     }
   }
   catch (TCLAP::ArgException& e)
