@@ -223,27 +223,22 @@ int main(int argc, char* argv[])
   try {
     TCLAP::CmdLine cmd("Zip each subdirectory. version: " PROJECT_VERSION, ' ', PROJECT_VERSION);
 
-    TCLAP::UnlabeledValueArg<std::string> a_input("input", "Input directory", true, "", "input");
-    cmd.add(a_input);
-    TCLAP::UnlabeledValueArg<std::string> a_output("output", "(optional) Output directory.", false, "", "output");
-    cmd.add(a_output);
-    TCLAP::ValueArg<std::string> a_depth("d", "depth", "(optional) Depth of the subdirectories.", false, "0", "int");
-    cmd.add(a_depth);
-    TCLAP::ValueArg<std::string> a_jobs("j", "jobs", "(optional) Number of simultaneous jobs.", false, "0", "int");
-    cmd.add(a_jobs);
-    TCLAP::ValueArg<std::string> a_level("l", "level", "(optional) Compression level.", false, "1", "int");
-    cmd.add(a_level);
+    TCLAP::UnlabeledValueArg<std::string> a_input("input", "Input directory", true, "", "input", cmd);
+    TCLAP::UnlabeledValueArg<std::string> a_output("output", "(optional) Output directory. <input> is used as <output> by default.", false, "", "output", cmd);
+    TCLAP::ValueArg<int> a_depth("d", "depth", "(optional) Depth of the subdirectories.", false, 0, "int", cmd);
+    TCLAP::ValueArg<int> a_jobs("j", "jobs", "(optional) Number of simultaneous jobs.", false, 0, "int", cmd);
+    TCLAP::ValueArg<int> a_level("l", "level", "(optional) Compression level. Default value is 1.", false, 1, "int", cmd);
 
-    TCLAP::SwitchArg a_file("", "file", "Compress files too, not just directories.", cmd, false);
-    TCLAP::SwitchArg a_skip("", "skip", "Skip existing files.", cmd, false);
-    TCLAP::SwitchArg a_dryrun("", "dryrun", "List subdirectories and exit.", cmd, false);
+    TCLAP::SwitchArg a_file("", "file", "Compress files too, not just directories.", cmd);
+    TCLAP::SwitchArg a_skip("", "skip", "Skip existing files.", cmd);
+    TCLAP::SwitchArg a_dryrun("", "dryrun", "List subdirectories and exit.", cmd);
     cmd.parse(argc, argv);
 
     auto input_dir = fs::path(a_input.getValue());
     auto output_dir = fs::path(a_output.isSet() ? a_output.getValue() : a_input.getValue());
-    auto depth = stoi(a_depth.getValue());
-    auto jobs = stoi(a_jobs.getValue());
-    auto level = stoi(a_level.getValue());
+    auto depth = a_depth.getValue();
+    auto jobs = a_jobs.getValue();
+    auto level = a_level.getValue();
     auto subdirs = list_subdirs(input_dir, depth, a_file.isSet());
     if (a_skip.isSet()) {
       auto result = std::remove_if(subdirs.begin(), subdirs.end(), [&input_dir, &output_dir](auto& d) {
