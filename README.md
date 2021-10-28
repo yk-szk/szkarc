@@ -10,3 +10,11 @@ Example
 ```sh
 zipdirs input output --depth 1 --jobs 4
 ```
+
+## unzipdirs
+Invert `zipdirs`.
+
+Example
+```sh
+unzipdirs input output --depth 1 --jobs 4
+```

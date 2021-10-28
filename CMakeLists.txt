@@ -40,5 +40,10 @@ include_directories(deps/indicators/include)
 
 configure_file(config.h.in config.h @ONLY)
 include_directories("${PROJECT_BINARY_DIR}") # for config.h
+add_library(szkarc szkarc.h szkarc.cpp)
+TARGET_LINK_LIBRARIES(szkarc minizip)
+
 ADD_EXECUTABLE(zipdirs main.cpp)
-TARGET_LINK_LIBRARIES(zipdirs minizip Threads::Threads)
+TARGET_LINK_LIBRARIES(zipdirs szkarc minizip Threads::Threads)
+ADD_EXECUTABLE(unzipdirs unzipdirs.cpp)
+TARGET_LINK_LIBRARIES(unzipdirs szkarc minizip Threads::Threads)

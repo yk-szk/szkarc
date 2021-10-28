@@ -1,7 +1,6 @@
 #include <filesystem>
 #include <iostream>
 #include <vector>
-#include <algorithm>
 #include <numeric>
 #include <thread>
 #include <exception>
@@ -14,141 +13,13 @@
 #include <tclap/CmdLine.h>
 #include <indicators/progress_bar.hpp>
 #include <config.h>
-#ifdef WIN32
-#include <windows.h>
-#endif
+#include "szkarc.h"
 
 namespace fs = std::filesystem;
 using std::cout;
 using std::cerr;
 using std::endl;
 using std::flush;
-
-#if defined(WIN32)
-int get_physical_core_counts() {
-  typedef BOOL(WINAPI* LPFN_GLPI)(
-    PSYSTEM_LOGICAL_PROCESSOR_INFORMATION,
-    PDWORD);
-  BOOL done = FALSE;
-  PSYSTEM_LOGICAL_PROCESSOR_INFORMATION buffer = NULL;
-  DWORD returnLength = 0;
-
-  LPFN_GLPI glpi = (LPFN_GLPI)GetProcAddress(GetModuleHandle(TEXT("kernel32")), "GetLogicalProcessorInformation");
-  if (NULL == glpi) {
-    throw std::runtime_error("GetLogicalProcessorInformation is not supported.");
-  }
-  while (!done) {
-    DWORD rc = glpi(buffer, &returnLength);
-    if (FALSE == rc) {
-      if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-        if (buffer) {
-          free(buffer);
-        }
-        buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(
-          returnLength);
-
-        if (NULL == buffer) {
-          throw std::runtime_error("Error: Allocation failure");
-        }
-      }
-      else {
-        throw std::runtime_error("Error");
-      }
-    }
-    else {
-      done = TRUE;
-    }
-  }
-
-  DWORD byteOffset = 0;
-  int processorCoreCount = 0;
-  PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = buffer;
-  if (NULL == ptr) {
-    throw std::runtime_error("Error: Allocation failure");
-  }
-  while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength) {
-    if (ptr->Relationship == RelationProcessorCore) {
-      processorCoreCount++;
-    }
-    byteOffset += sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
-    ptr++;
-  }
-  return processorCoreCount;
-}
-
-int32_t stream_os_open(void* stream, const char* path, int32_t mode) {
-  typedef struct mz_stream_win32_s {
-    mz_stream       stream;
-    HANDLE          handle;
-    int32_t         error;
-  } mz_stream_win32;
-
-  mz_stream_win32* win32 = (mz_stream_win32*)stream;
-  uint32_t desired_access = 0;
-  uint32_t creation_disposition = 0;
-  uint32_t share_mode = FILE_SHARE_READ;
-  uint32_t flags_attribs = FILE_ATTRIBUTE_NORMAL;
-  wchar_t* path_wide = NULL;
-
-
-  if (path == NULL)
-    return MZ_PARAM_ERROR;
-
-  /* Some use cases require write sharing as well */
-  share_mode |= FILE_SHARE_WRITE;
-
-  if ((mode & MZ_OPEN_MODE_READWRITE) == MZ_OPEN_MODE_READ) {
-    desired_access = GENERIC_READ;
-    creation_disposition = OPEN_EXISTING;
-  }
-  else if (mode & MZ_OPEN_MODE_APPEND) {
-    desired_access = GENERIC_WRITE | GENERIC_READ;
-    creation_disposition = OPEN_EXISTING;
-  }
-  else if (mode & MZ_OPEN_MODE_CREATE) {
-    desired_access = GENERIC_WRITE | GENERIC_READ;
-    creation_disposition = CREATE_ALWAYS;
-  }
-  else {
-    return MZ_PARAM_ERROR;
-  }
-
-  path_wide = mz_os_unicode_string_create(path, MZ_ENCODING_CODEPAGE_932);
-  if (path_wide == NULL)
-    return MZ_PARAM_ERROR;
-
-  win32->handle = CreateFileW(path_wide, desired_access, share_mode, NULL,
-    creation_disposition, flags_attribs, NULL);
-
-  mz_os_unicode_string_delete(&path_wide);
-
-  if (mz_stream_os_is_open(stream) != MZ_OK) {
-    win32->error = GetLastError();
-    return MZ_OPEN_ERROR;
-  }
-
-  if (mode & MZ_OPEN_MODE_APPEND)
-    return mz_stream_os_seek(stream, 0, MZ_SEEK_END);
-
-  return MZ_OK;
-}
-
-std::string wstr2utf8(std::wstring const& src)
-{
-  std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-  return converter.to_bytes(src);
-}
-
-#else
-
-int get_physical_core_counts() {
-  return std::thread::hardware_concurrency();
-}
-int32_t stream_os_open(void* stream, const char* path, int32_t mode) {
-  return mz_stream_os_open(stream, path, MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
-}
-
-#endif
 
 void  zip_directory(const fs::path& input, const fs::path& output, int16_t level) {
   void* zip_writer;
@@ -167,7 +38,7 @@ void  zip_directory(const fs::path& input, const fs::path& output, int16_t level
     throw std::runtime_error("Failed to open a zip file:" + output.string());
   }
 
-#ifdef WIN32
+#ifdef _WIN32
   auto utf8 = wstr2utf8(input.wstring());
   err = mz_zip_writer_add_path(zip_writer, utf8.c_str(), NULL, 0, 1);
 #else
@@ -206,19 +77,14 @@ PathList list_subdirs(const fs::path& indir, int depth, bool include_files) {
     std::transform(list.cbegin(), list.cend(), std::back_inserter(subdirs), [depth, include_files](const fs::path& p) {
       return list_subdirs(p, depth - 1, include_files);
       });
-
-    size_t total_size = std::transform_reduce(subdirs.cbegin(), subdirs.cend(), 0u, std::plus{}, [](const PathList& l) {return l.size(); });
-    PathList flat;
-    flat.reserve(total_size);
-    for (auto& subd : subdirs) {
-      flat.insert(
-        flat.end(),
-        std::make_move_iterator(subd.begin()),
-        std::make_move_iterator(subd.end())
-      );
-    }
+    auto flat = flatten_nested(subdirs);
     return flat;
   }
+}
+
+fs::path input2output(const fs::path &input_dir, const fs::path &output_dir, const fs::path &input) {
+  auto relative = input.lexically_relative(input_dir);
+  return (output_dir / relative).string() + ".zip";
 }
 
 int main(int argc, char* argv[])
@@ -246,8 +112,7 @@ int main(int argc, char* argv[])
     auto subdirs = list_subdirs(input_dir, depth, a_file.isSet());
     if (a_skip.isSet()) {
       auto result = std::remove_if(subdirs.begin(), subdirs.end(), [&input_dir, &output_dir](auto& d) {
-        auto relative = d.lexically_relative(input_dir);
-        auto output = (output_dir / relative).string() + ".zip";
+        auto output = input2output(input_dir, output_dir, d);
         return fs::exists(output);
         });
       auto orig_size = subdirs.size();
@@ -257,7 +122,7 @@ int main(int argc, char* argv[])
     if (!a_zip_empty.isSet()) {
       auto orig_size = subdirs.size();
       auto result = std::remove_if(subdirs.begin(), subdirs.end(), [](auto& d) {
-        return fs::is_directory(d) || fs::is_empty(d);
+        return fs::is_directory(d) && fs::is_empty(d);
         });
       subdirs.erase(result, subdirs.end());
       cout << "Skip " << orig_size - subdirs.size() << " empty directories." << endl;
@@ -268,8 +133,7 @@ int main(int argc, char* argv[])
     }
     if (a_dryrun.isSet()) {
       for (const auto& d : subdirs) {
-        auto relative = d.lexically_relative(input_dir);
-        auto output = (output_dir / relative).string() + ".zip";
+        auto output = input2output(input_dir, output_dir, d);
         cout << d.string() << " -> " << output << '\n';
       }
       cout << flush;
@@ -300,8 +164,7 @@ int main(int argc, char* argv[])
       threads.emplace_back([job_id, jobs, level, &subdirs, &input_dir, &output_dir, &bar, &mtx_mkdir, &ep]() {
         for (int i = job_id; i < subdirs.size(); i += jobs) {
           const auto& subdir = subdirs[i];
-          auto relative = subdir.lexically_relative(input_dir);
-          auto output = output_dir / (relative.string() + ".zip");
+          auto output = input2output(input_dir, output_dir, subdir);
           {
             std::lock_guard<std::mutex> lock(mtx_mkdir);
             if (!fs::exists(output.parent_path())) {
