@@ -23,48 +23,49 @@ using std::cout;
 using std::cerr;
 using std::endl;
 using std::flush;
-using std::runtime_error;
 
-int get_physical_core_counts() {
 #if defined(WIN32)
+int get_physical_core_counts() {
   typedef BOOL(WINAPI* LPFN_GLPI)(
     PSYSTEM_LOGICAL_PROCESSOR_INFORMATION,
     PDWORD);
-  LPFN_GLPI glpi;
   BOOL done = FALSE;
   PSYSTEM_LOGICAL_PROCESSOR_INFORMATION buffer = NULL;
-  PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = NULL;
   DWORD returnLength = 0;
-  DWORD byteOffset = 0;
-  PCACHE_DESCRIPTOR Cache;
-  int processorCoreCount = 0;
 
-  glpi = (LPFN_GLPI)GetProcAddress(GetModuleHandle(TEXT("kernel32")), "GetLogicalProcessorInformation");
+  LPFN_GLPI glpi = (LPFN_GLPI)GetProcAddress(GetModuleHandle(TEXT("kernel32")), "GetLogicalProcessorInformation");
   if (NULL == glpi) {
-    std::runtime_error("GetLogicalProcessorInformation is not supported.");
+    throw std::runtime_error("GetLogicalProcessorInformation is not supported.");
   }
   while (!done) {
     DWORD rc = glpi(buffer, &returnLength);
     if (FALSE == rc) {
       if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
-        if (buffer)
+        if (buffer) {
           free(buffer);
+        }
         buffer = (PSYSTEM_LOGICAL_PROCESSOR_INFORMATION)malloc(
           returnLength);
 
         if (NULL == buffer) {
-          std::runtime_error("Error: Allocation failure");
+          throw std::runtime_error("Error: Allocation failure");
         }
       }
       else {
-        std::runtime_error("Error");
+        throw std::runtime_error("Error");
       }
     }
     else {
       done = TRUE;
     }
   }
-  ptr = buffer;
+
+  DWORD byteOffset = 0;
+  int processorCoreCount = 0;
+  PSYSTEM_LOGICAL_PROCESSOR_INFORMATION ptr = buffer;
+  if (NULL == ptr) {
+    throw std::runtime_error("Error: Allocation failure");
+  }
   while (byteOffset + sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION) <= returnLength) {
     if (ptr->Relationship == RelationProcessorCore) {
       processorCoreCount++;
@@ -73,12 +74,8 @@ int get_physical_core_counts() {
     ptr++;
   }
   return processorCoreCount;
-#else
-  return std::thread::hardware_concurrency();
-#endif
 }
 
-#ifdef WIN32
 int32_t stream_os_open(void* stream, const char* path, int32_t mode) {
   typedef struct mz_stream_win32_s {
     mz_stream       stream;
@@ -141,6 +138,16 @@ std::string wstr2utf8(std::wstring const& src)
   std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
   return converter.to_bytes(src);
 }
+
+#else
+
+int get_physical_core_counts() {
+  return std::thread::hardware_concurrency();
+}
+int32_t stream_os_open(void* stream, const char* path, int32_t mode) {
+  return mz_stream_os_open(stream, path, MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
+}
+
 #endif
 
 void  zip_directory(const fs::path& input, const fs::path& output, int16_t level) {
@@ -151,17 +158,13 @@ void  zip_directory(const fs::path& input, const fs::path& output, int16_t level
   mz_stream_os_create(&file_stream);
   mz_zip_writer_set_compress_method(zip_writer, MZ_COMPRESS_METHOD_DEFLATE);
   mz_zip_writer_set_compress_level(zip_writer, level);
-#ifdef WIN32
   err = stream_os_open(file_stream, output.string().c_str(), MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
-#else
-  err = mz_stream_os_open(file_stream, output.string().c_str(), MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
-#endif
   if (err != MZ_OK) {
-    throw runtime_error("Failed to open a zip file:" + output.string());
+    throw std::runtime_error("Failed to open a zip file:" + output.string());
   }
   err = mz_zip_writer_open(zip_writer, file_stream, 0);
   if (err != MZ_OK) {
-    throw runtime_error("Failed to open a zip file:" + output.string());
+    throw std::runtime_error("Failed to open a zip file:" + output.string());
   }
 
 #ifdef WIN32
@@ -171,12 +174,12 @@ void  zip_directory(const fs::path& input, const fs::path& output, int16_t level
   err = mz_zip_writer_add_path(zip_writer, input.string().c_str(), NULL, 0, 1);
 #endif
   if (err != MZ_OK) {
-    throw runtime_error("Failed to compress:" + input.string());
+    throw std::runtime_error("Failed to compress:" + input.string());
   }
 
   err = mz_zip_writer_close(zip_writer);
   if (err != MZ_OK) {
-    throw runtime_error("Failed to close the zip writer:" + output.string());
+    throw std::runtime_error("Failed to close the zip writer:" + output.string());
   }
   mz_stream_os_close(file_stream);
   mz_stream_os_delete(&file_stream);
@@ -230,7 +233,8 @@ int main(int argc, char* argv[])
     TCLAP::ValueArg<int> a_level("l", "level", "(optional) Compression level. Default value is 1.", false, 1, "int", cmd);
 
     TCLAP::SwitchArg a_file("", "file", "Compress files too, not just directories.", cmd);
-    TCLAP::SwitchArg a_skip("", "skip", "Skip existing files.", cmd);
+    TCLAP::SwitchArg a_skip("", "skip", "Dont't zip when the output file exists.", cmd);
+    TCLAP::SwitchArg a_zip_empty("", "zip_empty", "Zip empty directories. By default, empty directories dont't get zipped.", cmd);
     TCLAP::SwitchArg a_dryrun("", "dryrun", "List subdirectories and exit.", cmd);
     cmd.parse(argc, argv);
 
@@ -248,7 +252,19 @@ int main(int argc, char* argv[])
         });
       auto orig_size = subdirs.size();
       subdirs.erase(result, subdirs.end());
-      cout << "Skip " << orig_size - subdirs.size() << " entries." << endl;
+      cout << "Skip " << orig_size - subdirs.size() << " existing entries." << endl;
+    }
+    if (!a_zip_empty.isSet()) {
+      auto orig_size = subdirs.size();
+      auto result = std::remove_if(subdirs.begin(), subdirs.end(), [](auto& d) {
+        return fs::is_directory(d) || fs::is_empty(d);
+        });
+      subdirs.erase(result, subdirs.end());
+      cout << "Skip " << orig_size - subdirs.size() << " empty directories." << endl;
+    }
+    if (subdirs.empty()) {
+      cout << "There is nothing to compress." << endl;
+      return 0;
     }
     if (a_dryrun.isSet()) {
       for (const auto& d : subdirs) {
@@ -274,7 +290,7 @@ int main(int argc, char* argv[])
     };
     if (jobs <= 0) {
       jobs = get_physical_core_counts();
-      cout << "Using " << jobs << " cores." << endl;
+      cout << "Using " << jobs << " CPU cores." << endl;
     }
     std::exception_ptr ep;
     std::mutex mtx_mkdir;
