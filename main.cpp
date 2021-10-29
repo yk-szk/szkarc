@@ -99,8 +99,8 @@ int main(int argc, char* argv[])
     TCLAP::ValueArg<int> a_level("l", "level", "(optional) Compression level. Default value is 1.", false, 1, "int", cmd);
 
     TCLAP::SwitchArg a_file("", "file", "Compress files too, not just directories.", cmd);
-    TCLAP::SwitchArg a_skip("", "skip", "Dont't zip when the output file exists.", cmd);
-    TCLAP::SwitchArg a_zip_empty("", "zip_empty", "Zip empty directories. By default, empty directories dont't get zipped.", cmd);
+    TCLAP::SwitchArg a_skip_empty("", "skip_empty", "Skip zipping empty directories.", cmd);
+    TCLAP::SwitchArg a_skip_exists("", "skip_existing", "Dont't zip when the output file exists.", cmd);
     TCLAP::SwitchArg a_dryrun("", "dryrun", "List subdirectories and exit.", cmd);
     cmd.parse(argc, argv);
 
@@ -110,7 +110,7 @@ int main(int argc, char* argv[])
     auto jobs = a_jobs.getValue();
     auto level = a_level.getValue();
     auto subdirs = list_subdirs(input_dir, depth, a_file.isSet());
-    if (a_skip.isSet()) {
+    if (a_skip_exists.isSet()) {
       auto result = std::remove_if(subdirs.begin(), subdirs.end(), [&input_dir, &output_dir](auto& d) {
         auto output = input2output(input_dir, output_dir, d);
         return fs::exists(output);
@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
       subdirs.erase(result, subdirs.end());
       cout << "Skip " << orig_size - subdirs.size() << " existing entries." << endl;
     }
-    if (!a_zip_empty.isSet()) {
+    if (a_skip_empty.isSet()) {
       auto orig_size = subdirs.size();
       auto result = std::remove_if(subdirs.begin(), subdirs.end(), [](auto& d) {
         return fs::is_directory(d) && fs::is_empty(d);

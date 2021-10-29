@@ -98,7 +98,7 @@ int main(int argc, char* argv[])
     TCLAP::ValueArg<int> a_depth("d", "depth", "(optional) Depth of the subdirectories.", false, 0, "int", cmd);
     TCLAP::ValueArg<int> a_jobs("j", "jobs", "(optional) Number of simultaneous jobs.", false, 0, "int", cmd);
 
-    TCLAP::SwitchArg a_skip("", "skip", "Dont't unzip when the output directory exists.", cmd);
+    TCLAP::SwitchArg a_skip_exists("", "skip_existing", "Dont't unzip when the output directory exists.", cmd);
     TCLAP::SwitchArg a_dryrun("", "dryrun", "List zip files to unzip and exit.", cmd);
     cmd.parse(argc, argv);
 
@@ -107,7 +107,7 @@ int main(int argc, char* argv[])
     auto depth = a_depth.getValue();
     auto jobs = a_jobs.getValue();
     auto zipfiles = list_zipfiles(input_dir, depth);
-    if (a_skip.isSet()) {
+    if (a_skip_exists.isSet()) {
       auto result = std::remove_if(zipfiles.begin(), zipfiles.end(), [&input_dir, &output_dir](auto& zf) {
         auto output = input2output(input_dir, output_dir, zf);
         return fs::exists(output);
