@@ -29,7 +29,7 @@ void  zip_directory(const fs::path& input, const fs::path& output, int16_t level
   mz_stream_os_create(&file_stream);
   mz_zip_writer_set_compress_method(zip_writer, MZ_COMPRESS_METHOD_DEFLATE);
   mz_zip_writer_set_compress_level(zip_writer, level);
-  err = stream_os_open(file_stream, output.string().c_str(), MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
+  err = stream_os_open(file_stream, output, MZ_OPEN_MODE_WRITE | MZ_OPEN_MODE_CREATE);
   if (err != MZ_OK) {
     throw std::runtime_error("Failed to open a zip file:" + output.string());
   }

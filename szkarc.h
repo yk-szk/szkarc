@@ -5,9 +5,10 @@
 #include <vector>
 #include <numeric>
 #include <algorithm>
+#include <filesystem>
 
 int get_physical_core_counts();
-int32_t stream_os_open(void* stream, const char* path, int32_t mode);
+int32_t stream_os_open(void* stream, const std::filesystem::path& path, int32_t mode);
 
 template <typename T>
 std::vector<T> flatten_nested(const std::vector<std::vector<T>>& nested) {

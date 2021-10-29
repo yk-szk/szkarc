@@ -28,7 +28,7 @@ void unzip(const fs::path& input, const fs::path& output)
   mz_zip_reader_create(&zip_reader);
   mz_stream_os_create(&file_stream);
 
-  int32_t err = stream_os_open(file_stream, input.string().c_str(), MZ_OPEN_MODE_READ);
+  int32_t err = stream_os_open(file_stream, input, MZ_OPEN_MODE_READ);
   if (err != MZ_OK) {
     throw std::runtime_error("Failed to open a zip file:" + input.string());
   }

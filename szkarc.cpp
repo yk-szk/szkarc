@@ -59,7 +59,7 @@ int get_physical_core_counts() {
   }
   return processorCoreCount;
 }
-int32_t stream_os_open(void* stream, const char* path, int32_t mode) {
+int32_t stream_os_open(void* stream, const std::filesystem::path& path, int32_t mode) {
   typedef struct mz_stream_win32_s {
     mz_stream       stream;
     HANDLE          handle;
@@ -71,11 +71,6 @@ int32_t stream_os_open(void* stream, const char* path, int32_t mode) {
   uint32_t creation_disposition = 0;
   uint32_t share_mode = FILE_SHARE_READ;
   uint32_t flags_attribs = FILE_ATTRIBUTE_NORMAL;
-  wchar_t* path_wide = NULL;
-
-
-  if (path == NULL)
-    return MZ_PARAM_ERROR;
 
   /* Some use cases require write sharing as well */
   share_mode |= FILE_SHARE_WRITE;
@@ -96,14 +91,8 @@ int32_t stream_os_open(void* stream, const char* path, int32_t mode) {
     return MZ_PARAM_ERROR;
   }
 
-  path_wide = mz_os_unicode_string_create(path, MZ_ENCODING_CODEPAGE_932);
-  if (path_wide == NULL)
-    return MZ_PARAM_ERROR;
-
-  win32->handle = CreateFileW(path_wide, desired_access, share_mode, NULL,
+  win32->handle = CreateFileW(path.wstring().c_str(), desired_access, share_mode, NULL,
     creation_disposition, flags_attribs, NULL);
-
-  mz_os_unicode_string_delete(&path_wide);
 
   if (mz_stream_os_is_open(stream) != MZ_OK) {
     win32->error = GetLastError();
@@ -121,11 +110,25 @@ std::string wstr2utf8(std::wstring const& src)
   return converter.to_bytes(src);
 }
 #else
+
+int32_t stream_os_open(void* stream, const std::filesystem::path& path, int32_t mode) {
+  return mz_stream_os_open(stream, path.string().c_str(), mode);
+}
+
+#ifdef __APPLE__
+#include <sys/types.h>
+#include <sys/sysctl.h>
+int get_physical_core_counts() {
+  int32_t core_count = 0;
+  size_t  len = sizeof(core_count);
+  int ret = sysctlbyname("machdep.cpu.core_count", &core_count, &len, 0, 0);
+  return core_count;
+}
+#else
 int get_physical_core_counts() {
   return std::thread::hardware_concurrency();
 }
-int32_t stream_os_open(void* stream, const char* path, int32_t mode) {
-  return mz_stream_os_open(stream, path, mode);
-}
+#endif
+
 #endif
 
