@@ -18,3 +18,11 @@ Example
 ```sh
 unzipdirs input output --depth 1 --jobs 4
 ```
+
+## deldirs
+Delete directories matching specified conditions.
+
+Example
+```sh
+deldirs input --absent filename
+```

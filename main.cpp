@@ -57,31 +57,6 @@ void  zip_directory(const fs::path& input, const fs::path& output, int16_t level
   mz_zip_writer_delete(&zip_writer);
 };
 
-using PathList = std::vector<fs::path>;
-PathList list_subdirs(const fs::path& indir, int depth, bool include_files) {
-  PathList list;
-  for (const auto& ent : fs::directory_iterator(indir)) {
-    if (ent.is_directory()) {
-      list.push_back(ent.path());
-    }
-    else if (include_files) {
-      list.push_back(ent.path());
-    }
-  }
-  std::sort(list.begin(), list.end());
-  if (depth == 0) {
-    return list;
-  }
-  else {
-    std::vector<PathList> subdirs;
-    std::transform(list.cbegin(), list.cend(), std::back_inserter(subdirs), [depth, include_files](const fs::path& p) {
-      return list_subdirs(p, depth - 1, include_files);
-      });
-    auto flat = flatten_nested(subdirs);
-    return flat;
-  }
-}
-
 fs::path input2output(const fs::path &input_dir, const fs::path &output_dir, const fs::path &input) {
   auto relative = input.lexically_relative(input_dir);
   return (output_dir / relative).string() + ".zip";
