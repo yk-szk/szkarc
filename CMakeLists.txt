@@ -49,3 +49,7 @@ ADD_EXECUTABLE(unzipdirs unzipdirs.cpp)
 TARGET_LINK_LIBRARIES(unzipdirs szkarc minizip Threads::Threads)
 ADD_EXECUTABLE(deldirs deldirs.cpp)
 TARGET_LINK_LIBRARIES(deldirs szkarc)
+
+enable_testing()
+
+add_test(NAME test_deldirs COMMAND $<TARGET_FILE:deldirs> WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
