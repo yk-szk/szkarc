@@ -76,6 +76,7 @@ int main(int argc, char* argv[])
     TCLAP::SwitchArg a_file("", "file", "Compress files too, not just directories.", cmd);
     TCLAP::SwitchArg a_skip_empty("", "skip_empty", "Skip zipping empty directories.", cmd);
     TCLAP::SwitchArg a_skip_exists("", "skip_existing", "Dont't zip when the output file exists.", cmd);
+    TCLAP::SwitchArg a_all("a", "all", "Do not ignore hidden files (i.e. entries starting with \".\").", cmd);
     TCLAP::SwitchArg a_dryrun("", "dryrun", "List subdirectories and exit.", cmd);
     cmd.parse(argc, argv);
 
@@ -84,7 +85,7 @@ int main(int argc, char* argv[])
     auto depth = a_depth.getValue();
     auto jobs = a_jobs.getValue();
     auto level = a_level.getValue();
-    auto subdirs = list_subdirs(input_dir, depth, a_file.isSet());
+    auto subdirs = list_subdirs(input_dir, depth, a_all.isSet(), a_file.isSet());
     if (a_skip_exists.isSet()) {
       auto result = std::remove_if(subdirs.begin(), subdirs.end(), [&input_dir, &output_dir](auto& d) {
         auto output = input2output(input_dir, output_dir, d);

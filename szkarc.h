@@ -27,7 +27,7 @@ std::vector<T> flatten_nested(const std::vector<std::vector<T>>& nested) {
 }
 
 using PathList = std::vector<std::filesystem::path>;
-PathList list_subdirs(const std::filesystem::path& indir, int depth, bool include_files);
+PathList list_subdirs(const std::filesystem::path& indir, int depth, bool all, bool include_files);
 
 #ifdef _WIN32
 std::string wstr2utf8(std::wstring const& src);

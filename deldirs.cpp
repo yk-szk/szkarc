@@ -25,10 +25,11 @@ int main(int argc, char* argv[])
 
     TCLAP::MultiArg<std::string> a_present("p", "present", "Present condition. Directories containing specified filename/dirname get deleted.", false, "filename", cmd);
     TCLAP::MultiArg<std::string> a_absent("a", "absent", "Absent condition. Directories not containing specified filename/dirname get deleted.", false, "filename", cmd);
+    TCLAP::SwitchArg a_all("a", "all", "Do not ignore hidden files (i.e. entries starting with \".\").", cmd);
     cmd.parse(argc, argv);
 
     auto input_dir = fs::path(a_input.getValue());
-    auto subdirs = list_subdirs(input_dir, a_depth.getValue(), false);
+    auto subdirs = list_subdirs(input_dir, a_depth.getValue(), a_all.isSet(), false);
     const std::vector<std::string>& cond_present = a_present.getValue();
     const std::vector<std::string>& cond_absent = a_absent.getValue();
 

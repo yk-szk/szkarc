@@ -133,9 +133,12 @@ int get_physical_core_counts() {
 
 #endif
 
-PathList list_subdirs(const std::filesystem::path& indir, int depth, bool include_files) {
+PathList list_subdirs(const std::filesystem::path& indir, int depth, bool all, bool include_files) {
   PathList list;
   for (const auto& ent : fs::directory_iterator(indir)) {
+    if (!all && !ent.path().filename().empty() && ent.path().filename().string()[0] == '.') {
+      continue;
+    }
     if (ent.is_directory()) {
       list.push_back(ent.path());
     }
@@ -149,8 +152,8 @@ PathList list_subdirs(const std::filesystem::path& indir, int depth, bool includ
   }
   else {
     std::vector<PathList> subdirs;
-    std::transform(list.cbegin(), list.cend(), std::back_inserter(subdirs), [depth, include_files](const fs::path& p) {
-      return list_subdirs(p, depth - 1, include_files);
+    std::transform(list.cbegin(), list.cend(), std::back_inserter(subdirs), [depth, all, include_files](const fs::path& p) {
+      return list_subdirs(p, depth - 1, all, include_files);
       });
     auto flat = flatten_nested(subdirs);
     return flat;
