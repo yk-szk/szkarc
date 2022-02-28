@@ -1,0 +1,91 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
+
+jobs:
+  build-windows:
+    runs-on: windows-2019
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
+    - name: Build dependencies
+      shell: cmd
+      run: script/build_deps.bat
+
+    - name: Build binary
+      shell: cmd
+      run: script/build.bat
+
+    - name: Zip
+      run: |
+        powershell Compress-Archive -Path build\Release\*.exe -DestinationPath szkarc-windows.zip
+
+    - name: Upload
+      uses: actions/upload-artifact@v1
+      with:
+        name: artifacts
+        path: szkarc-windows.zip
+
+  build-unix:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+
+    - name: Build dependencies
+      shell: bash
+      run: script/build_deps.sh
+
+    - name: Build binary
+      shell: bash
+      run: script/build.sh
+
+    - name: Zip
+      run: |
+        zip szkarc-${{ matrix.os }}.zip build/bin/*
+
+    - name: Upload
+      uses: actions/upload-artifact@v1
+      with:
+        name: artifacts
+        path: szkarc-${{ matrix.os }}.zip
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-unix]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v1
+      with:
+        name: artifacts
+
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Release ${{ github.ref }}
+        body: ${{ github.event.head_commit.message }}
+        draft: false
+        prerelease: false
+        files: |
+          artifacts/szkarc-windows.zip
+          artifacts/szkarc-ubuntu-latest.zip
+          artifacts/szkarc-macos-latest.zip
