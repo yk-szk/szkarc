@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
       if (absent_unmet) {
         return true;
       }
-      bool present_unmet = std::any_of(cond_absent.cbegin(), cond_absent.cend(),
+      bool present_unmet = std::any_of(cond_present.cbegin(), cond_present.cend(),
         [&subdir](const std::string& filename) {return !fs::exists(subdir / fs::path(filename)); });
       if (present_unmet) {
         return true;
