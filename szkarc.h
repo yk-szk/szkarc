@@ -7,6 +7,18 @@
 #include <algorithm>
 #include <filesystem>
 
+#define CONCATENATE(e1, e2) e1 ## e2
+
+#ifdef _WIN32
+#define WCOUT std::wcout
+#define WSTRING wstring
+#define WPREFIX(s) CONCATENATE(L, s)
+#else
+#define WCOUT std::cout
+#define WSTRING u8string
+#define WPREFIX(s) s
+#endif
+
 int get_physical_core_counts();
 int32_t stream_os_open(void* stream, const std::filesystem::path& path, int32_t mode);
 
@@ -41,7 +53,7 @@ public:
 #else
 class local_setmode {
   // do nothing
-}
+};
 #endif
 
 

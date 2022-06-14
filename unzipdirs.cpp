@@ -85,7 +85,7 @@ PathList list_zipfiles(const fs::path& indir, int depth) {
 
 fs::path input2output(const fs::path &input_dir, const fs::path &output_dir, const fs::path &input) {
   auto relative = input.lexically_relative(input_dir);
-  return (output_dir / relative.replace_extension("")).wstring();
+  return (output_dir / relative.replace_extension("")).WSTRING();
 }
 
 int main(int argc, char* argv[])
@@ -124,7 +124,7 @@ int main(int argc, char* argv[])
       auto mode = local_setmode();
       for (const auto& zf : zipfiles) {
         auto output = input2output(input_dir, output_dir, zf);
-        std::wcout << zf.wstring() << " -> " << output.wstring() << '\n';
+        WCOUT << zf.WSTRING() << " -> " << output.WSTRING() << '\n';
       }
       cout << flush;
       return 0;

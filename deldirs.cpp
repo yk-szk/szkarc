@@ -61,10 +61,10 @@ int main(int argc, char* argv[])
       auto mode = local_setmode();
       cout << "Deleting directories..." << endl;
       for (const auto& subdir : subdirs) {
-        auto msg = L"Delete \"" + subdir.wstring() + L"\"? (Y/N): ";
+        auto msg = WPREFIX("Delete \"") + subdir.WSTRING() + WPREFIX("\"? (Y/N): ");
         bool yes = a_yes.isSet();  // if --yes option is set, following while loop is skipped.
         while (!yes) {
-          std::wcout << msg << flush;
+          WCOUT << msg << flush;
           std::string ans;
           std::cin >> ans;
           if (ans == "y" || ans == "Y") {
@@ -87,7 +87,7 @@ int main(int argc, char* argv[])
       cout << "Dryrun. Add \"--exec\" option to execute the deletion.\n";
       auto mode = local_setmode();
       for (const auto& subdir : subdirs) {
-        std::wcout << subdir.wstring() << '\n';
+        WCOUT << subdir.WSTRING() << '\n';
       }
       cout << flush;
       return 0;

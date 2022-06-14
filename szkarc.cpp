@@ -149,7 +149,7 @@ int get_physical_core_counts() {
 PathList list_subdirs(const std::filesystem::path& indir, int depth, bool all, bool include_files) {
   PathList list;
   for (const auto& ent : fs::directory_iterator(indir)) {
-    if (!all && !ent.path().filename().empty() && ent.path().filename().wstring()[0] == '.') {
+    if (!all && !ent.path().filename().empty() && ent.path().filename().u8string()[0] == '.') {
       continue;
     }
     if (ent.is_directory()) {

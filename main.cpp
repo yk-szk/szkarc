@@ -59,7 +59,7 @@ void  zip_directory(const fs::path& input, const fs::path& output, int16_t level
 
 fs::path input2output(const fs::path& input_dir, const fs::path& output_dir, const fs::path& input) {
   auto relative = input.lexically_relative(input_dir);
-  auto output = (output_dir / relative).wstring() + L".zip";
+  auto output = (output_dir / relative).WSTRING() + WPREFIX(".zip");
   return output;
 }
 
@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
       auto mode = local_setmode();
       for (const auto& d : subdirs) {
         auto output = input2output(input_dir, output_dir, d);
-        std::wcout << d.wstring() << " -> " << output.wstring() << '\n';
+        WCOUT << d.WSTRING() << " -> " << output.WSTRING() << '\n';
       }
       cout << flush;
       return 0;
