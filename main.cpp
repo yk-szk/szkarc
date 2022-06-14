@@ -1,4 +1,4 @@
-#include <filesystem>
+﻿#include <filesystem>
 #include <iostream>
 #include <vector>
 #include <numeric>
@@ -57,9 +57,10 @@ void  zip_directory(const fs::path& input, const fs::path& output, int16_t level
   mz_zip_writer_delete(&zip_writer);
 };
 
-fs::path input2output(const fs::path &input_dir, const fs::path &output_dir, const fs::path &input) {
+fs::path input2output(const fs::path& input_dir, const fs::path& output_dir, const fs::path& input) {
   auto relative = input.lexically_relative(input_dir);
-  return (output_dir / relative).string() + ".zip";
+  auto output = (output_dir / relative).wstring() + L".zip";
+  return output;
 }
 
 int main(int argc, char* argv[])
@@ -86,6 +87,7 @@ int main(int argc, char* argv[])
     auto jobs = a_jobs.getValue();
     auto level = a_level.getValue();
     auto subdirs = list_subdirs(input_dir, depth, a_all.isSet(), a_file.isSet());
+
     if (a_skip_exists.isSet()) {
       auto result = std::remove_if(subdirs.begin(), subdirs.end(), [&input_dir, &output_dir](auto& d) {
         auto output = input2output(input_dir, output_dir, d);
@@ -108,9 +110,10 @@ int main(int argc, char* argv[])
       return 0;
     }
     if (a_dryrun.isSet()) {
+      auto mode = local_setmode();
       for (const auto& d : subdirs) {
         auto output = input2output(input_dir, output_dir, d);
-        cout << d.string() << " -> " << output << '\n';
+        std::wcout << d.wstring() << " -> " << output.wstring() << '\n';
       }
       cout << flush;
       return 0;
@@ -168,6 +171,11 @@ int main(int argc, char* argv[])
   catch (TCLAP::ArgException& e)
   {
     std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
+    return 1;
+  }
+  catch (std::system_error& e) {
+    cerr << e.code() << endl;
+    cerr << e.what() << endl;
     return 1;
   }
   catch (std::exception& e) {

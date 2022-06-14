@@ -31,6 +31,18 @@ PathList list_subdirs(const std::filesystem::path& indir, int depth, bool all, b
 
 #ifdef _WIN32
 std::string wstr2utf8(std::wstring const& src);
+class local_setmode {
+private:
+  int prev_mode;
+public:
+  local_setmode();
+  ~local_setmode();
+};
+#else
+class local_setmode {
+  // do nothing
+}
 #endif
+
 
 #endif /* SZKARC_H */

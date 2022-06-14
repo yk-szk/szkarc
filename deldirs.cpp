@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
 
     TCLAP::MultiArg<std::string> a_present("p", "present", "Present condition. Directories containing specified filename/dirname get deleted.", false, "filename", cmd);
     TCLAP::MultiArg<std::string> a_absent("a", "absent", "Absent condition. Directories not containing specified filename/dirname get deleted.", false, "filename", cmd);
-    TCLAP::SwitchArg a_all("a", "all", "Do not ignore hidden files (i.e. entries starting with \".\").", cmd);
+    TCLAP::SwitchArg a_all("", "all", "Do not ignore hidden files (i.e. entries starting with \".\").", cmd);
     cmd.parse(argc, argv);
 
     auto input_dir = fs::path(a_input.getValue());
@@ -58,12 +58,13 @@ int main(int argc, char* argv[])
       return 0;
     }
     if (a_exec.isSet()) {
+      auto mode = local_setmode();
       cout << "Deleting directories..." << endl;
       for (const auto& subdir : subdirs) {
-        auto msg = "Delete \"" + subdir.string() + "\"? (Y/N): ";
+        auto msg = L"Delete \"" + subdir.wstring() + L"\"? (Y/N): ";
         bool yes = a_yes.isSet();  // if --yes option is set, following while loop is skipped.
         while (!yes) {
-          cout << msg << flush;
+          std::wcout << msg << flush;
           std::string ans;
           std::cin >> ans;
           if (ans == "y" || ans == "Y") {
@@ -84,8 +85,9 @@ int main(int argc, char* argv[])
     }
     else {  // dryrun
       cout << "Dryrun. Add \"--exec\" option to execute the deletion.\n";
+      auto mode = local_setmode();
       for (const auto& subdir : subdirs) {
-        cout << subdir.string() << '\n';
+        std::wcout << subdir.wstring() << '\n';
       }
       cout << flush;
       return 0;

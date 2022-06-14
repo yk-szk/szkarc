@@ -1,5 +1,6 @@
 #include "szkarc.h"
 #include <thread>
+#include <iostream>
 #include <codecvt>
 #include <mz.h>
 #include <mz_os.h>
@@ -9,6 +10,8 @@ namespace fs = std::filesystem;
 
 #ifdef _WIN32
 #include <windows.h>
+#include <io.h>
+#include <fcntl.h>
 
 int get_physical_core_counts() {
   typedef BOOL(WINAPI* LPFN_GLPI)(
@@ -105,6 +108,16 @@ int32_t stream_os_open(void* stream, const std::filesystem::path& path, int32_t 
 
   return MZ_OK;
 }
+
+local_setmode::local_setmode() {
+  prev_mode = _setmode(_fileno(stdout), _O_U16TEXT);
+  _setmode(_fileno(stderr), _O_U16TEXT);
+};
+local_setmode::~local_setmode() {
+  _setmode(_fileno(stdout), prev_mode);
+  _setmode(_fileno(stderr), prev_mode);
+};
+
 std::string wstr2utf8(std::wstring const& src)
 {
   std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
@@ -136,7 +149,7 @@ int get_physical_core_counts() {
 PathList list_subdirs(const std::filesystem::path& indir, int depth, bool all, bool include_files) {
   PathList list;
   for (const auto& ent : fs::directory_iterator(indir)) {
-    if (!all && !ent.path().filename().empty() && ent.path().filename().string()[0] == '.') {
+    if (!all && !ent.path().filename().empty() && ent.path().filename().wstring()[0] == '.') {
       continue;
     }
     if (ent.is_directory()) {
@@ -159,5 +172,6 @@ PathList list_subdirs(const std::filesystem::path& indir, int depth, bool all, b
     return flat;
   }
 }
+
 
 
