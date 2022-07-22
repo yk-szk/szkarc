@@ -79,6 +79,7 @@ int main(int argc, char* argv[])
     TCLAP::SwitchArg a_skip_exists("", "skip_existing", "Dont't zip when the output file exists.", cmd);
     TCLAP::SwitchArg a_all("a", "all", "Do not ignore hidden files (i.e. entries starting with \".\").", cmd);
     TCLAP::SwitchArg a_dryrun("", "dryrun", "List subdirectories and exit.", cmd);
+    TCLAP::SwitchArg a_delete("", "delete", "Delete sources after zipping.", cmd);
     cmd.parse(argc, argv);
 
     auto input_dir = fs::path(a_input.getValue());
@@ -86,6 +87,7 @@ int main(int argc, char* argv[])
     auto depth = a_depth.getValue();
     auto jobs = a_jobs.getValue();
     auto level = a_level.getValue();
+    auto delete_flag = a_delete.isSet();
     auto subdirs = list_subdirs(input_dir, depth, a_all.isSet(), a_file.isSet());
 
     if (a_file.isSet()) {
@@ -120,6 +122,9 @@ int main(int argc, char* argv[])
       for (const auto& d : subdirs) {
         auto output = input2output(input_dir, output_dir, d);
         WCOUT << d.WSTRING() << " -> " << output.WSTRING() << '\n';
+        if (a_delete.isSet()) {
+          WCOUT << "Delete: " << d.WSTRING() << '\n';
+        }
       }
       cout << flush;
       return 0;
@@ -146,7 +151,7 @@ int main(int argc, char* argv[])
     std::vector<std::thread> threads;
     threads.reserve(jobs);
     for (int job_id = 0; job_id < jobs; ++job_id) {
-      threads.emplace_back([job_id, jobs, level, &subdirs, &input_dir, &output_dir, &bar, &mtx_mkdir, &ep]() {
+      threads.emplace_back([job_id, jobs, level, &subdirs, &input_dir, &output_dir, &bar, &mtx_mkdir, &ep, delete_flag]() {
         for (int i = job_id; i < subdirs.size(); i += jobs) {
           const auto& subdir = subdirs[i];
           auto output = input2output(input_dir, output_dir, subdir);
@@ -158,6 +163,9 @@ int main(int argc, char* argv[])
           }
           try {
             zip_directory(subdir, output, level);
+            if (delete_flag) {
+              fs::remove_all(subdir);
+            }
           }
           catch (...) {
             ep = std::current_exception();
