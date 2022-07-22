@@ -88,6 +88,12 @@ int main(int argc, char* argv[])
     auto level = a_level.getValue();
     auto subdirs = list_subdirs(input_dir, depth, a_all.isSet(), a_file.isSet());
 
+    if (a_file.isSet()) {
+      auto result = std::remove_if(subdirs.begin(), subdirs.end(), [](auto& d) {
+        return d.extension() == ".zip";
+        });
+      subdirs.erase(result, subdirs.end());
+    }
     if (a_skip_exists.isSet()) {
       auto result = std::remove_if(subdirs.begin(), subdirs.end(), [&input_dir, &output_dir](auto& d) {
         auto output = input2output(input_dir, output_dir, d);
