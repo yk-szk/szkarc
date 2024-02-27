@@ -65,6 +65,12 @@ fs::path input2output(const fs::path& input_dir, const fs::path& output_dir, con
   return output;
 }
 
+enum class ErrorHandle
+{
+    Break,
+    Continue
+};
+
 int main(int argc, char* argv[])
 {
   spdlog::cfg::load_env_levels();
@@ -74,6 +80,7 @@ int main(int argc, char* argv[])
   TCLAP::ValueArg<int> a_depth("d", "depth", "(optional) Depth of the subdirectories.", false, 0, "int", cmd);
   TCLAP::ValueArg<int> a_jobs("j", "jobs", "(optional) Number of simultaneous jobs.", false, 0, "int", cmd);
   TCLAP::ValueArg<int> a_level("l", "level", "(optional) Compression level. Default value is 1.", false, 1, "int", cmd);
+  TCLAP::ValueArg<std::string> a_error("", "error", "(optional) Error handling. `break` breaks the loop and exit the program and `continue` ignores the error and continues the loop. Default is `break`.", false, "break", "break or continue", cmd);
 
   TCLAP::SwitchArg a_file("", "file", "Compress files too, not just directories.", cmd);
   TCLAP::SwitchArg a_skip_empty("", "skip_empty", "Skip zipping empty directories.", cmd);
@@ -94,6 +101,16 @@ int main(int argc, char* argv[])
     auto depth = a_depth.getValue();
     auto jobs = a_jobs.getValue();
     auto level = a_level.getValue();
+    auto error = ErrorHandle::Break;
+    if (a_error.isSet()) {
+      if (a_error.getValue() == "continue") {
+        error = ErrorHandle::Continue;
+      } else if (a_error.getValue() == "break") {
+        error = ErrorHandle::Break;
+      } else {
+        throw std::runtime_error("Invalid error handling: " + a_error.getValue() + "\n. Use `break` or `continue`.");
+      }
+    }
     auto delete_flag = a_delete.isSet();
     auto subdirs = list_subdirs(input_dir, depth, a_all.isSet(), a_file.isSet());
 
@@ -158,8 +175,12 @@ int main(int argc, char* argv[])
     std::vector<std::thread> threads;
     threads.reserve(jobs);
     for (int job_id = 0; job_id < jobs; ++job_id) {
-      threads.emplace_back([job_id, jobs, level, &subdirs, &input_dir, &output_dir, &bar, &mtx_mkdir, &ep, delete_flag]() {
+      threads.emplace_back([job_id, jobs, level, error, &subdirs, &input_dir, &output_dir, &bar, &mtx_mkdir, &ep, delete_flag]() {
         for (int i = job_id; i < subdirs.size(); i += jobs) {
+          if (ep) {
+            spdlog::error("Error occured in other thread. Break the loop.");
+            return;
+          }
           const auto& subdir = subdirs[i];
           auto output = input2output(input_dir, output_dir, subdir);
           {
@@ -175,8 +196,13 @@ int main(int argc, char* argv[])
             }
           }
           catch (...) {
-            ep = std::current_exception();
-            break;
+            if (error == ErrorHandle::Break) {
+              spdlog::error("Error for input {}", subdir.string());
+              ep = std::current_exception();
+              return;
+            } else {
+              spdlog::error("Error for input {} but continue the loop", subdir.string());
+            }
           }
           bar.tick();
         }
@@ -190,16 +216,15 @@ int main(int argc, char* argv[])
     }
   }
   catch (std::system_error& e) {
-    cerr << e.code() << endl;
-    cerr << e.what() << endl;
+    spdlog::error("Error code {}: {}",e.code().value(), e.what());
     return 1;
   }
   catch (std::exception& e) {
-    cerr << e.what() << endl;
+    spdlog::error(e.what());
     return 1;
   }
   catch (const std::string& e) {
-    cerr << e << endl;
+    spdlog::error(e);
     return 1;
   }
   return 0;
