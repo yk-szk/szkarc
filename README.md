@@ -26,3 +26,11 @@ Example
 ```sh
 deldirs input --absent filename
 ```
+
+## Logs
+Set log level
+```sh
+SPDLOG_LEVEL=info zipdirs input output
+```
+
+default is info

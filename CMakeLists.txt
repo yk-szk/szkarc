@@ -34,6 +34,7 @@ SET(MZ_LIBBSD OFF CACHE BOOL "Disable")
 SET(MZ_ICONV OFF CACHE BOOL "Disable")
 SET(MZ_SIGNING OFF CACHE BOOL "Disable")
 add_subdirectory(deps/minizip-ng)
+add_subdirectory(deps/spdlog)
 
 include_directories(deps/tclap/include)
 include_directories(deps/indicators/include)
@@ -44,9 +45,11 @@ add_library(szkarc szkarc.h szkarc.cpp)
 TARGET_LINK_LIBRARIES(szkarc minizip)
 
 ADD_EXECUTABLE(zipdirs main.cpp)
-TARGET_LINK_LIBRARIES(zipdirs szkarc minizip Threads::Threads)
+TARGET_LINK_LIBRARIES(zipdirs PRIVATE szkarc minizip Threads::Threads spdlog::spdlog $<$<BOOL:${MINGW}>:ws2_32>)
+
 ADD_EXECUTABLE(unzipdirs unzipdirs.cpp)
-TARGET_LINK_LIBRARIES(unzipdirs szkarc minizip Threads::Threads)
+TARGET_LINK_LIBRARIES(unzipdirs PRIVATE szkarc minizip Threads::Threads spdlog::spdlog $<$<BOOL:${MINGW}>:ws2_32>)
+
 ADD_EXECUTABLE(deldirs deldirs.cpp)
 TARGET_LINK_LIBRARIES(deldirs szkarc)
 

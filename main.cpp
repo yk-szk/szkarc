@@ -14,6 +14,8 @@
 #include <indicators/progress_bar.hpp>
 #include <config.h>
 #include "szkarc.h"
+#include "spdlog/spdlog.h"
+#include "spdlog/cfg/env.h"
 
 namespace fs = std::filesystem;
 using std::cout;
@@ -65,6 +67,7 @@ fs::path input2output(const fs::path& input_dir, const fs::path& output_dir, con
 
 int main(int argc, char* argv[])
 {
+  spdlog::cfg::load_env_levels();
   try {
     TCLAP::CmdLine cmd("Zip each subdirectory. version: " PROJECT_VERSION, ' ', PROJECT_VERSION);
 
@@ -144,7 +147,7 @@ int main(int argc, char* argv[])
     };
     if (jobs <= 0) {
       jobs = get_physical_core_counts();
-      cout << "Using " << jobs << " CPU cores." << endl;
+      spdlog::info("Using {} CPU cores.", jobs);
     }
     std::exception_ptr ep;
     std::mutex mtx_mkdir;

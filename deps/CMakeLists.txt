@@ -8,3 +8,5 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 SET(ZLIB_COMPAT ON)
 SET(ZLIB_ENABLE_TESTS OFF)
 add_subdirectory(zlib-ng)
+
+add_subdirectory(spdlog)

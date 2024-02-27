@@ -10,3 +10,6 @@
 [submodule "deps/indicators"]
 	path = deps/indicators
 	url = git@github.com:p-ranav/indicators.git
+[submodule "deps/spdlog"]
+	path = deps/spdlog
+	url = git@github.com:gabime/spdlog.git
