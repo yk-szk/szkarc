@@ -68,23 +68,27 @@ fs::path input2output(const fs::path& input_dir, const fs::path& output_dir, con
 int main(int argc, char* argv[])
 {
   spdlog::cfg::load_env_levels();
+  TCLAP::CmdLine cmd("Zip each subdirectory. version: " PROJECT_VERSION, ' ', PROJECT_VERSION);
+  TCLAP::UnlabeledValueArg<std::string> a_input("input", "Input directory", true, "", "input", cmd);
+  TCLAP::UnlabeledValueArg<std::string> a_output("output", "(optional) Output directory. <input> is used as <output> by default.", false, "", "output", cmd);
+  TCLAP::ValueArg<int> a_depth("d", "depth", "(optional) Depth of the subdirectories.", false, 0, "int", cmd);
+  TCLAP::ValueArg<int> a_jobs("j", "jobs", "(optional) Number of simultaneous jobs.", false, 0, "int", cmd);
+  TCLAP::ValueArg<int> a_level("l", "level", "(optional) Compression level. Default value is 1.", false, 1, "int", cmd);
+
+  TCLAP::SwitchArg a_file("", "file", "Compress files too, not just directories.", cmd);
+  TCLAP::SwitchArg a_skip_empty("", "skip_empty", "Skip zipping empty directories.", cmd);
+  TCLAP::SwitchArg a_skip_exists("", "skip_existing", "Dont't zip when the output file exists.", cmd);
+  TCLAP::SwitchArg a_all("a", "all", "Do not ignore hidden files (i.e. entries starting with \".\").", cmd);
+  TCLAP::SwitchArg a_dryrun("", "dryrun", "List subdirectories and exit.", cmd);
+  TCLAP::SwitchArg a_delete("", "delete", "Delete sources after zipping.", cmd);
   try {
-    TCLAP::CmdLine cmd("Zip each subdirectory. version: " PROJECT_VERSION, ' ', PROJECT_VERSION);
-
-    TCLAP::UnlabeledValueArg<std::string> a_input("input", "Input directory", true, "", "input", cmd);
-    TCLAP::UnlabeledValueArg<std::string> a_output("output", "(optional) Output directory. <input> is used as <output> by default.", false, "", "output", cmd);
-    TCLAP::ValueArg<int> a_depth("d", "depth", "(optional) Depth of the subdirectories.", false, 0, "int", cmd);
-    TCLAP::ValueArg<int> a_jobs("j", "jobs", "(optional) Number of simultaneous jobs.", false, 0, "int", cmd);
-    TCLAP::ValueArg<int> a_level("l", "level", "(optional) Compression level. Default value is 1.", false, 1, "int", cmd);
-
-    TCLAP::SwitchArg a_file("", "file", "Compress files too, not just directories.", cmd);
-    TCLAP::SwitchArg a_skip_empty("", "skip_empty", "Skip zipping empty directories.", cmd);
-    TCLAP::SwitchArg a_skip_exists("", "skip_existing", "Dont't zip when the output file exists.", cmd);
-    TCLAP::SwitchArg a_all("a", "all", "Do not ignore hidden files (i.e. entries starting with \".\").", cmd);
-    TCLAP::SwitchArg a_dryrun("", "dryrun", "List subdirectories and exit.", cmd);
-    TCLAP::SwitchArg a_delete("", "delete", "Delete sources after zipping.", cmd);
     cmd.parse(argc, argv);
-
+  } catch (TCLAP::ArgException& e)
+  {
+    std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
+    return 1;
+  }
+  try {
     auto input_dir = fs::path(a_input.getValue());
     auto output_dir = fs::path(a_output.isSet() ? a_output.getValue() : a_input.getValue());
     auto depth = a_depth.getValue();
@@ -184,11 +188,6 @@ int main(int argc, char* argv[])
     if (ep) {
       std::rethrow_exception(ep);
     }
-  }
-  catch (TCLAP::ArgException& e)
-  {
-    std::cerr << "error: " << e.error() << " for arg " << e.argId() << std::endl;
-    return 1;
   }
   catch (std::system_error& e) {
     cerr << e.code() << endl;
