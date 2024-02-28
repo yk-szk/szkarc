@@ -53,6 +53,8 @@ TARGET_LINK_LIBRARIES(unzipdirs PRIVATE szkarc minizip Threads::Threads spdlog::
 ADD_EXECUTABLE(deldirs deldirs.cpp)
 TARGET_LINK_LIBRARIES(deldirs szkarc)
 
-enable_testing()
-
-add_test(NAME test_deldirs COMMAND $<TARGET_FILE:deldirs> WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+option(ENABLE_TESTS "Enable tests" OFF)
+if (${ENABLE_TESTS})
+    enable_testing()
+    add_test(NAME test_zipdirs COMMAND $<TARGET_FILE:zipdirs> input output WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/tests)
+endif()
